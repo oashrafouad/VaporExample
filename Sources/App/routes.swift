@@ -1,22 +1,43 @@
 import Vapor
+import Fluent
+
+// Define a struct to represent the JSON response
+struct JokeResponse: Content {
+    let content: String
+}
+
+// Define a struct to represent the JSON request for adding a joke
+struct AddJokeRequest: Content {
+    let joke: String
+}
 
 func routes(_ app: Application) throws {
     app.get { req async in
-        "It works! #2"
+        "Call /joke to get a random joke"
     }
 
-    app.get("hello") { req async -> String in
-        "Hello, world!"
+    // Route to return a random joke
+    app.get("joke") { req async throws -> JokeResponse in
+        let jokes = try await Joke.query(on: req.db).all()
+        guard let randomJoke = jokes.randomElement() else {
+            return JokeResponse(content: "No jokes available.")
+        }
+        return JokeResponse(content: randomJoke.content)
     }
 
-    app.get("example") { req async -> String in
+    // Route to add a new joke
+    app.post("add-joke") { req async throws -> HTTPStatus in
+        let addJokeRequest = try req.content.decode(AddJokeRequest.self)
+        
+        // Basic authentication
+        guard let authHeader = req.headers.basicAuthorization,
+              authHeader.username == "amourakora2001@gmail.com",
+              authHeader.password == "BuDj8gYhQBLzc" else {
+            throw Abort(.unauthorized)
+        }
 
-        "This is an example"
+        let joke = Joke(content: addJokeRequest.joke)
+        try await joke.save(on: req.db)
+        return .ok
     }
-    // app.get("hello", ":name") { req async -> String in
-    //     guard let name = req.parameters.get("name") else {
-    //         throw Abort(.badRequest)
-    //     }
-    //     return "Hello, \(name)!"
-    // }
 }
